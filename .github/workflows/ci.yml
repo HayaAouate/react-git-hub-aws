@@ -1,0 +1,36 @@
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  only:
+    - main  # Ne déployer que si push sur la branche main
+  before_script:
+    - apt-get update -y                    # Mettre à jour les paquets
+    - apt-get install -y openssh-client     # Installer openssh-client pour la connexion SSH
+
+  script:
+    # Créer le répertoire .ssh
+    - mkdir -p ~/.ssh
+
+    # Déposer la clé privée dans le fichier Dani.pem
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/Dani.pem  # Récupérer la clé privée depuis la variable d'environnement
+    - chmod 600 ~/.ssh/Dani.pem                     # Assurez-vous que la clé privée a les bonnes permissions
+
+    # Ajouter la clé publique de l'EC2 aux known_hosts pour éviter l'avertissement de sécurité
+    - ssh-keyscan -H ec2-13-51-199-113.eu-north-1.compute.amazonaws.com >> ~/.ssh/known_hosts
+
+    # Se connecter en SSH à l'instance EC2 et déployer le code
+    - ssh -i ~/.ssh/Dani.pem ubuntu@ec2-13-51-199-113.eu-north-1.compute.amazonaws.com << EOF
+      cd react-git-hub-aws          # Allez dans le répertoire du projet sur le serveur EC2
+      git pull origin main              # Récupérez la dernière version du code depuis la branche main
+      docker compose down
+      docker compose up -d
+      EOF
+
+    # Supprimer le répertoire .ssh après le déploiement pour des raisons de sécurité
+    - rm -rf ~/.ssh
+
+  environment:
+    name: production
+    url: http://ec2-13-51-199-113.eu-north-1.compute.amazonaws.com  # URL de votre instance EC2
