@@ -1,0 +1,47 @@
+name: Deploy to EC2 with Docker
+
+on:
+  push:
+    branches:
+      - master  # Déployer uniquement quand il y a un push sur la branche main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # Utiliser une machine Ubuntu pour exécuter le job
+
+    steps:
+      # Étape 1: Vérifier le code source
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Étape 2: Installer les dépendances
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # Clé privée SSH stockée dans les secrets GitHub
+
+      - name: Install SSH client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y openssh-client
+
+      # Étape 3: Ajouter la clé publique de l'EC2 aux known_hosts pour éviter les avertissements de sécurité
+      - name: Add EC2 to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      # Étape 4: Se connecter en SSH à l'instance EC2 et déployer le code
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_HOST }} << EOF
+            cd react-git-hub-aws        # Accéder au répertoire du projet
+            git pull origin main              # Récupérer la dernière version du code depuis la branche main
+            docker-compose down              # Arrêter les conteneurs existants
+            docker system prune -f           # Supprimer les anciens conteneurs et images inutilisées
+            docker-compose up --build -d     # Recréer les conteneurs et démarrer l'application
+          EOF
+
+      # Étape 5: Supprimer le répertoire .ssh après le déploiement pour des raisons de sécurité
+      - name: Clean up SSH
+        run: rm -rf ~/.ssh
