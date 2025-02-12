@@ -4,7 +4,7 @@ stages:
 deploy:
   stage: deploy
   only:
-    - main  # Ne déployer que si push sur la branche main
+    - master  # Ne déployer que si push sur la branche main
   before_script:
     - apt-get update -y                    # Mettre à jour les paquets
     - apt-get install -y openssh-client     # Installer openssh-client pour la connexion SSH
