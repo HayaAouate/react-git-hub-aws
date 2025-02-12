@@ -1,36 +1,47 @@
-stages:
-  - deploy
+name: Deploy to EC2 with Docker
 
-deploy:
-  stage: deploy
-  only:
-    - master  # Ne déployer que si push sur la branche main
-  before_script:
-    - apt-get update -y                    # Mettre à jour les paquets
-    - apt-get install -y openssh-client     # Installer openssh-client pour la connexion SSH
+on:
+  push:
+    branches:
+      - master  # Déployer uniquement quand il y a un push sur la branche main
 
-  script:
-    # Créer le répertoire .ssh
-    - mkdir -p ~/.ssh
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # Utiliser une machine Ubuntu pour exécuter le job
 
-    # Déposer la clé privée dans le fichier Dani.pem
-    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/Dani.pem  # Récupérer la clé privée depuis la variable d'environnement
-    - chmod 600 ~/.ssh/Dani.pem                     # Assurez-vous que la clé privée a les bonnes permissions
+    steps:
+      # Étape 1: Vérifier le code source
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    # Ajouter la clé publique de l'EC2 aux known_hosts pour éviter l'avertissement de sécurité
-    - ssh-keyscan -H ec2-13-51-199-113.eu-north-1.compute.amazonaws.com >> ~/.ssh/known_hosts
+      # Étape 2: Installer les dépendances
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # Clé privée SSH stockée dans les secrets GitHub
 
-    # Se connecter en SSH à l'instance EC2 et déployer le code
-    - ssh -i ~/.ssh/Dani.pem ubuntu@ec2-13-51-199-113.eu-north-1.compute.amazonaws.com << EOF
-      cd react-git-hub-aws          # Allez dans le répertoire du projet sur le serveur EC2
-      git pull origin main              # Récupérez la dernière version du code depuis la branche main
-      docker compose down
-      docker compose up -d
-      EOF
+      - name: Install SSH client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y openssh-client
 
-    # Supprimer le répertoire .ssh après le déploiement pour des raisons de sécurité
-    - rm -rf ~/.ssh
+      # Étape 3: Ajouter la clé publique de l'EC2 aux known_hosts pour éviter les avertissements de sécurité
+      - name: Add EC2 to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-  environment:
-    name: production
-    url: http://ec2-13-51-199-113.eu-north-1.compute.amazonaws.com  # URL de votre instance EC2
+      # Étape 4: Se connecter en SSH à l'instance EC2 et déployer le code
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_HOST }} << EOF
+            cd react-git-hub-aws        # Accéder au répertoire du projet
+            git pull origin main              # Récupérer la dernière version du code depuis la branche main
+            docker-compose down              # Arrêter les conteneurs existants
+            docker system prune -f           # Supprimer les anciens conteneurs et images inutilisées
+            docker-compose up --build -d     # Recréer les conteneurs et démarrer l'application
+          EOF
+
+      # Étape 5: Supprimer le répertoire .ssh après le déploiement pour des raisons de sécurité
+      - name: Clean up SSH
+        run: rm -rf ~/.ssh
