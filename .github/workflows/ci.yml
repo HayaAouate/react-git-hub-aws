@@ -1,35 +1,35 @@
+
+name: Deploy to EC2 with Docker
+
+on:
+  push:
+    branches:
+      - master  # Déployer uniquement quand il y a un push sur la branche main
+
 jobs:
   deploy:
-    runs-on: ubuntu-latest  # GitHub Actions exécute ce job sur une VM Ubuntu
+    runs-on: ubuntu-latest
+
     steps:
-      # Étape 1 : Checkout du code source
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Étape 2 : Installer le client SSH
-      - name: Install SSH client
-        run: sudo apt-get install -y openssh-client
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # Étape 3 : Ajouter la clé privée SSH
-      - name: Set up SSH private key
-        run: echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-      # Étape 4 : Appliquer les bonnes permissions à la clé SSH
-      - name: Set correct permissions for SSH key
-        run: chmod 600 ~/.ssh/id_rsa
-
-      # Étape 5 : Ajouter GitHub à known_hosts
-      - name: Add GitHub to known hosts
-        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-      # Étape 6 : Se connecter à votre instance EC2 et déployer
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.WORK_DIR }}
-            git pull origin ${{ secrets.MAIN_BRANCH }}
+            git pull origin main
             docker-compose down
-            docker-compose up -d --build
+            docker system prune -af
+            docker-compose up --build -d
           EOF
+
+      - name: Cleanup SSH key
+        run: run:rm-rf~/.ssh
+
