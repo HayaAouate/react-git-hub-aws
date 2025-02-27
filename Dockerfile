@@ -21,3 +21,4 @@ EXPOSE 3000
 
 # Étape 8 : Lancer l'application (généralement dans un serveur HTTP)
 CMD ["npm", "start"]
+
