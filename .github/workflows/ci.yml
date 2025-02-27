@@ -1,0 +1,35 @@
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # GitHub Actions exécute ce job sur une VM Ubuntu
+    steps:
+      # Étape 1 : Checkout du code source
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Étape 2 : Installer le client SSH
+      - name: Install SSH client
+        run: sudo apt-get install -y openssh-client
+
+      # Étape 3 : Ajouter la clé privée SSH
+      - name: Set up SSH private key
+        run: echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      # Étape 4 : Appliquer les bonnes permissions à la clé SSH
+      - name: Set correct permissions for SSH key
+        run: chmod 600 ~/.ssh/id_rsa
+
+      # Étape 5 : Ajouter GitHub à known_hosts
+      - name: Add GitHub to known hosts
+        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      # Étape 6 : Se connecter à votre instance EC2 et déployer
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd ${{ secrets.WORK_DIR }}
+            git pull origin ${{ secrets.MAIN_BRANCH }}
+            docker-compose down
+            docker-compose up -d --build
+          EOF
