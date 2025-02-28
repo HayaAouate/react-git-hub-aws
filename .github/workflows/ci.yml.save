@@ -1,0 +1,33 @@
+name: Deploy to EC2 with Dock
+on:
+  push:
+    branches:
+      - master  # Déployer uniquement quand il y a un push sur la branche main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd ${{ secrets.WORK_DIR }}
+            git pull origin main
+            docker-compose down
+            docker system prune -af
+            docker-compose up --build -d
+          EOF
+
+      - name: Cleanup SSH key
+        run: run:rm-rf~/.ssh
+
