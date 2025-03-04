@@ -1,47 +1,35 @@
-name: Deploy to EC2 with Docker
+name: Deploy React App
 
 on:
   push:
     branches:
-      - master  # Déployer uniquement quand il y a un push sur la branche main
+      - master
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest  # Utiliser une machine Ubuntu pour exécuter le job
+    runs-on: ubuntu-latest
 
     steps:
-      # Étape 1: Vérifier le code source
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      # Étape 2: Installer les dépendances
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # Clé privée SSH stockée dans les secrets GitHub
-
-      - name: Install SSH client
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y openssh-client
-
-      # Étape 3: Ajouter la clé publique de l'EC2 aux known_hosts pour éviter les avertissements de sécurité
-      - name: Add EC2 to known_hosts
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # Étape 4: Se connecter en SSH à l'instance EC2 et déployer le code
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_HOST }} << EOF
-            cd react-git-hub-aws        # Accéder au répertoire du projet
-            git pull origin main              # Récupérer la dernière version du code depuis la branche main
-            docker-compose down              # Arrêter les conteneurs existants
-            docker system prune -f           # Supprimer les anciens conteneurs et images inutilisées
-            docker-compose up --build -d     # Recréer les conteneurs et démarrer l'application
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd ${{ secrets.WORK_DIR }}
+            git pull origin master
+            docker-compose down
+            docker system prune -af
+            docker image prune -af
+            docker-compose up --build -d
           EOF
 
-      # Étape 5: Supprimer le répertoire .ssh après le déploiement pour des raisons de sécurité
-      - name: Clean up SSH
-        run: rm -rf ~/.ssh
+      - name: Cleanup SSH key
+        run: rm -rf ~/.ssh
