@@ -1,10 +1,9 @@
-
 name: Deploy to EC2 with Docker
 
 on:
   push:
     branches:
-      - master  # Déployer uniquement quand il y a un push sur la branche main
+      - master  # Déployer uniquement quand il y a un push sur la branche master
 
 jobs:
   deploy:
@@ -17,19 +16,18 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
+          # Créer la clé privée SSH dans ~/.ssh/id_rsa à partir de GitHub Secrets
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          # Ajouter l'hôte GitHub au fichier known_hosts pour éviter des erreurs de sécurité
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd ${{ secrets.WORK_DIR }}
-            git pull origin main
+            cd /home/ubuntu/app/react-git-hub-aws
+            git pull origin master
             docker-compose down
-            docker system prune -af
-            docker-compose up --build -d
+            docker-compose up -d --build
           EOF
-
-      - name: Cleanup SSH key
-        run: run:rm-rf~/.ssh
 
