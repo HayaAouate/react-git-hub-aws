@@ -1,35 +1,34 @@
-name: Deploy React App
+  name: Deploy to EC2
 
-on:
-  push:
-    branches:
-      - master
+  on:
+    push:
+      branches:
+        - main
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v3
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+        - name: Setup SSH connexion
+          run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd ${{ secrets.WORK_DIR }}
-            git pull origin ${{secrets.MAIN_BRANCH}}
-            docker-compose down
-            docker system prune -af
-            docker image prune -af
-            docker-compose up --build -d
-          EOF
-
-      - name: Cleanup SSH key
-        run: rm -rf ~/.ssh
+        - name: Deploy to EC2 with docker
+          run: |
+            ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+              cd ${{ secrets.WORK_DIR }}
+              git pull origin ${{ secrets.MAIN_BRANCH }}
+              docker-compose -f docker-compose.yml down
+              docker system prune -af
+              docker image prune -af
+              docker-compose up -d --build
+            EOF
+        - name: Cleanup
+          run: rm -rf ~/.ssh
