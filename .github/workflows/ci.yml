@@ -24,7 +24,7 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.WORK_DIR }}
-            git pull origin master
+            git pull origin ${{secrets.MAIN_BRANCH}}
             docker-compose down
             docker system prune -af
             docker image prune -af
