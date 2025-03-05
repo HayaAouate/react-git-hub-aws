@@ -4,8 +4,6 @@ services:
     build: .
     ports:
       - "3000:3000"  # Lier le port 3000 du conteneur au port 3000 de la machine hôte
-    restart: always
-    volumes:
-      - .:/app
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+    restart: always
